@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -12,12 +14,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const data = await kv.get(`script:${id}`)
+    const data = await redis.get(`script:${id}`)
     if (!data) {
       return res.status(404).json({ error: 'File not found' })
     }
 
-    const script = JSON.parse(data)
+    const script = typeof data === 'string' ? JSON.parse(data) : data
     const downloadName = `${script.name || 'protected'}_locked.lua`
 
     res.setHeader('Content-Type', 'application/octet-stream')
