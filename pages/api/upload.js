@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,21 +16,21 @@ export default async function handler(req, res) {
 
     const host = req.headers.host || 'localhost:3000'
     const protocol = host.includes('localhost') ? 'http' : 'https'
-    const virtualUrl = `${protocol}://${host}/api/run/${id}`
+    const runUrl = `${protocol}://${host}/api/run/${id}`
 
-    await kv.set(`script:${id}`, JSON.stringify({
+    await redis.set(`script:${id}`, JSON.stringify({
       id,
       name: customName || originalName?.replace(/\.lua$/i, '') || 'protected',
       originalName: originalName || 'file.lua',
       encryptedData,
       size: size || 0,
       createdAt: new Date().toISOString(),
-    }), { ex: 2592000 }) // 30 days expiry
+    }), { ex: 2592000 })
 
     return res.status(200).json({
       success: true,
       id,
-      virtualUrl,
+      runUrl,
     })
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message })
