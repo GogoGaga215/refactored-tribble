@@ -38,19 +38,13 @@ export default function Home() {
     return id
   }
 
-  const safeB64 = (str) => {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => {
-      return String.fromCharCode(parseInt(p1, 16))
-    }))
-  }
-
   const encryptLua = (text) => {
     const key = Math.floor(Math.random() * 255) + 1
     let encrypted = ''
     for (let i = 0; i < text.length; i++) {
       encrypted += String.fromCharCode(text.charCodeAt(i) ^ key)
     }
-    return safeB64(String.fromCharCode(key) + encrypted)
+    return btoa(String.fromCharCode(key) + encrypted)
   }
 
   const handleFileSelect = (e) => {
@@ -95,26 +89,31 @@ export default function Home() {
       const id = generateId()
       const name = customName.trim() || file.name.replace(/\.lua$/i, '')
 
-      const fileData = {
-        id,
-        name,
-        original: file.name,
-        encrypted: encrypted,
-        size: file.size,
-        date: new Date().toLocaleString(),
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          customName: name,
+          originalName: file.name,
+          encryptedData: encrypted,
+          size: file.size,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Upload failed')
       }
 
-      const allFiles = JSON.parse(localStorage.getItem('zl_files') || '{}')
-      allFiles[id] = fileData
-      localStorage.setItem('zl_files', JSON.stringify(allFiles))
-
-      const virtualUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/virtual/file/${id}`
+      const runUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/run/${id}`
 
       const record = {
         id,
         name,
         original: file.name,
-        url: virtualUrl,
+        url: runUrl,
         size: file.size,
         date: new Date().toLocaleString(),
       }
@@ -123,7 +122,7 @@ export default function Home() {
       setHistory(newHistory)
       localStorage.setItem('zl_history', JSON.stringify(newHistory))
 
-      setResult({ url: virtualUrl, id })
+      setResult({ url: runUrl, id })
       showMessage('Success! Your Lua file is now protected.', 'success')
     } catch (err) {
       showMessage('Error: ' + err.message, 'error')
@@ -138,6 +137,16 @@ export default function Home() {
       showMessage('URL copied to clipboard!', 'success')
     }).catch(() => {
       showMessage('Failed to copy. Tap and hold the URL to copy manually.', 'error')
+    })
+  }
+
+  const copyLoadstring = () => {
+    if (!result) return
+    const code = `loadstring(game:HttpGet("${result.url}"))()`
+    navigator.clipboard.writeText(code).then(() => {
+      showMessage('Loadstring copied to clipboard!', 'success')
+    }).catch(() => {
+      showMessage('Failed to copy.', 'error')
     })
   }
 
@@ -190,6 +199,7 @@ export default function Home() {
         .zl-result { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,245,255,0.2); border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; position: relative; overflow: hidden; }
         .zl-result::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00f5ff, #7b2ff7, transparent); animation: scan 3s linear infinite; }
         .zl-url { font-family: monospace; font-size: 0.85rem; color: #00f5ff; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; border: 1px solid rgba(0,245,255,0.15); word-break: break-all; margin: 10px 0; cursor: pointer; }
+        .zl-loadstring { font-family: monospace; font-size: 0.75rem; color: #aaa; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); word-break: break-all; margin: 8px 0; }
         .zl-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,255,100,0.1); border: 1px solid rgba(0,255,100,0.3); color: #00ff64; padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; margin-bottom: 15px; }
         .zl-dot { width: 8px; height: 8px; background: #00ff64; border-radius: 50%; animation: blink 2s infinite; }
         .zl-msg { padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; font-size: 0.9rem; }
@@ -272,16 +282,17 @@ export default function Home() {
           {result && (
             <div className="zl-result">
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#00f5ff', fontWeight: 700, marginBottom: '10px' }}>
-                &#128272; Protected Virtual URL
+                &#128272; Protected Run URL
               </div>
               <div className="zl-url" onClick={copyUrl}>{result.url}</div>
-              <div style={{ fontSize: '0.75rem', color: '#666' }}>Tap URL to copy</div>
+              <div className="zl-loadstring">{`loadstring(game:HttpGet("${result.url}"))()`}</div>
+              <div style={{ fontSize: '0.75rem', color: '#666' }}>Tap URL or loadstring to copy</div>
               <div className="zl-btn-group">
-                <a href={`/api/download/${result.id}`} className="zl-btn zl-btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                  &#11015; Download Protected
-                </a>
-                <a href={`/virtual/file/${result.id}`} target="_blank" className="zl-btn zl-btn-secondary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                  &#128065; View Protection
+                <button className="zl-btn zl-btn-primary" onClick={copyLoadstring}>
+                  &#128203; Copy Loadstring
+                </button>
+                <a href={`/api/download/${result.id}`} className="zl-btn zl-btn-secondary" style={{ textDecoration: 'none', display: 'inline-block' }}>
+                  &#11015; Download Encrypted
                 </a>
               </div>
             </div>
