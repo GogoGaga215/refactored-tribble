@@ -38,13 +38,19 @@ export default function Home() {
     return id
   }
 
+  const safeB64 = (str) => {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => {
+      return String.fromCharCode(parseInt(p1, 16))
+    }))
+  }
+
   const encryptLua = (text) => {
     const key = Math.floor(Math.random() * 255) + 1
     let encrypted = ''
     for (let i = 0; i < text.length; i++) {
       encrypted += String.fromCharCode(text.charCodeAt(i) ^ key)
     }
-    return btoa(String.fromCharCode(key) + encrypted)
+    return safeB64(String.fromCharCode(key) + encrypted)
   }
 
   const handleFileSelect = (e) => {
@@ -324,4 +330,5 @@ export default function Home() {
       </div>
     </>
   )
- }
+                }
+                
