@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -6,13 +8,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const keys = await kv.keys('script:*')
+    const keys = await redis.keys('script:*')
     const scripts = []
 
     for (const key of keys) {
-      const data = await kv.get(key)
+      const data = await redis.get(key)
       if (data) {
-        const script = JSON.parse(data)
+        const script = typeof data === 'string' ? JSON.parse(data) : data
         scripts.push({
           id: script.id,
           name: script.name,
