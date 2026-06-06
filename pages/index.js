@@ -104,6 +104,9 @@ export default function Home() {
         date: new Date().toLocaleString(),
       }
 
+      const allFiles date: new Date().toLocaleString(),
+      }
+
       const allFiles = JSON.parse(localStorage.getItem('zl_files') || '{}')
       allFiles[id] = fileData
       localStorage.setItem('zl_files', JSON.stringify(allFiles))
@@ -314,4 +317,4 @@ export default function Home() {
     </>
   )
  }
-                   
+    
