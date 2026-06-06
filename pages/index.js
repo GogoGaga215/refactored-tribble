@@ -87,7 +87,7 @@ export default function Home() {
     }
 
     setLoading(true)
-    showMessage('Encrypting and uploading... please wait', 'success')
+    showMessage('Encrypting... please wait', 'success')
 
     try {
       const text = await file.text()
@@ -95,29 +95,26 @@ export default function Home() {
       const id = generateId()
       const name = customName.trim() || file.name.replace(/\.lua$/i, '')
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          customName: name,
-          originalName: file.name,
-          encryptedData: encrypted,
-          size: file.size,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Upload failed')
+      const fileData = {
+        id,
+        name,
+        original: file.name,
+        encrypted: encrypted,
+        size: file.size,
+        date: new Date().toLocaleString(),
       }
+
+      const allFiles = JSON.parse(localStorage.getItem('zl_files') || '{}')
+      allFiles[id] = fileData
+      localStorage.setItem('zl_files', JSON.stringify(allFiles))
+
+      const virtualUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/virtual/file/${id}`
 
       const record = {
         id,
         name,
         original: file.name,
-        url: data.virtualUrl,
+        url: virtualUrl,
         size: file.size,
         date: new Date().toLocaleString(),
       }
@@ -126,7 +123,7 @@ export default function Home() {
       setHistory(newHistory)
       localStorage.setItem('zl_history', JSON.stringify(newHistory))
 
-      setResult({ url: data.virtualUrl, id })
+      setResult({ url: virtualUrl, id })
       showMessage('Success! Your Lua file is now protected.', 'success')
     } catch (err) {
       showMessage('Error: ' + err.message, 'error')
@@ -315,6 +312,6 @@ export default function Home() {
         </div>
       </div>
     </>
-   )
-  }
-        
+  )
+ }
+                   
