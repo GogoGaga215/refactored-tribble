@@ -8,6 +8,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
   const [history, setHistory] = useState([])
+  const [apiKey, setApiKey] = useState('')
+  const [showKeyModal, setShowKeyModal] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('zl_history')
@@ -16,6 +18,8 @@ export default function Home() {
         setHistory(JSON.parse(saved))
       } catch {}
     }
+    const savedKey = localStorage.getItem('zl_apikey')
+    if (savedKey) setApiKey(savedKey)
   }, [])
 
   const showMessage = (text, type) => {
@@ -36,21 +40,6 @@ export default function Home() {
     let id = ''
     for (let i = 0; i < 16; i++) id += chars.charAt(Math.floor(Math.random() * chars.length))
     return id
-  }
-
-  const safeB64 = (str) => {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => {
-      return String.fromCharCode(parseInt(p1, 16))
-    }))
-  }
-
-  const encryptLua = (text) => {
-    const key = Math.floor(Math.random() * 255) + 1
-    let encrypted = ''
-    for (let i = 0; i < text.length; i++) {
-      encrypted += String.fromCharCode(text.charCodeAt(i) ^ key)
-    }
-    return safeB64(String.fromCharCode(key) + encrypted)
   }
 
   const handleFileSelect = (e) => {
@@ -85,13 +74,17 @@ export default function Home() {
       showMessage('No file selected! Tap the upload area first.', 'error')
       return
     }
+    if (!apiKey) {
+      setShowKeyModal(true)
+      showMessage('Please set an API Key first!', 'error')
+      return
+    }
 
     setLoading(true)
-    showMessage('Encrypting... please wait', 'success')
+    showMessage('Uploading... please wait', 'success')
 
     try {
-      const text = await file.text()
-      const encrypted = encryptLua(text)
+      const plainCode = await file.text()
       const id = generateId()
       const name = customName.trim() || file.name.replace(/\.lua$/i, '')
 
@@ -102,8 +95,9 @@ export default function Home() {
           id,
           customName: name,
           originalName: file.name,
-          encryptedData: encrypted,
+          plainCode,
           size: file.size,
+          apiKey,
         }),
       })
 
@@ -113,13 +107,12 @@ export default function Home() {
         throw new Error(data.error || 'Upload failed')
       }
 
-      const runUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/run/${id}`
-
       const record = {
         id,
         name,
         original: file.name,
-        url: runUrl,
+        url: data.runUrl,
+        token: data.token,
         size: file.size,
         date: new Date().toLocaleString(),
       }
@@ -128,22 +121,13 @@ export default function Home() {
       setHistory(newHistory)
       localStorage.setItem('zl_history', JSON.stringify(newHistory))
 
-      setResult({ url: runUrl, id })
-      showMessage('Success! Your Lua file is now protected.', 'success')
+      setResult({ url: data.runUrl, token: data.token, id })
+      showMessage('Success! Your Lua script is now protected.', 'success')
     } catch (err) {
       showMessage('Error: ' + err.message, 'error')
     } finally {
       setLoading(false)
     }
-  }
-
-  const copyUrl = () => {
-    if (!result) return
-    navigator.clipboard.writeText(result.url).then(() => {
-      showMessage('URL copied to clipboard!', 'success')
-    }).catch(() => {
-      showMessage('Failed to copy. Tap and hold the URL to copy manually.', 'error')
-    })
   }
 
   const copyLoadstring = () => {
@@ -156,6 +140,32 @@ export default function Home() {
     })
   }
 
+  const copyRequestAsync = () => {
+    if (!result) return
+    const code = `local HttpService = game:GetService("HttpService")
+local response = HttpService:RequestAsync({
+    Url = "${result.url}",
+    Method = "GET",
+    Headers = { ["x-zinlocked-key"] = "${apiKey}" }
+})
+loadstring(response.Body)()`
+    navigator.clipboard.writeText(code).then(() => {
+      showMessage('RequestAsync code copied!', 'success')
+    }).catch(() => {
+      showMessage('Failed to copy.', 'error')
+    })
+  }
+
+  const saveApiKey = () => {
+    if (!apiKey.trim()) {
+      showMessage('Enter a valid API key!', 'error')
+      return
+    }
+    localStorage.setItem('zl_apikey', apiKey)
+    setShowKeyModal(false)
+    showMessage('API Key saved!', 'success')
+  }
+
   const resetAll = () => {
     setFile(null)
     setCustomName('')
@@ -164,7 +174,7 @@ export default function Home() {
   }
 
   const loadHistory = (record) => {
-    setResult({ url: record.url, id: record.id })
+    setResult({ url: record.url, token: record.token, id: record.id })
     setCustomName(record.name)
     showMessage('Loaded from history!', 'success')
   }
@@ -218,7 +228,11 @@ export default function Home() {
         .zl-furl { font-family: monospace; font-size: 0.7rem; color: #666; margin-top: 2px; }
         .zl-factions { display: flex; gap: 6px; }
         .zl-small { padding: 6px 12px; font-size: 0.75rem; }
-        .hidden { display: none !important; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-box { background: rgba(20,20,30,0.95); border: 1px solid rgba(0,245,255,0.2); border-radius: 16px; padding: 30px; max-width: 400px; width: 90%; }
+        .modal-title { font-size: 1.2rem; font-weight: 700; color: #00f5ff; margin-bottom: 15px; }
+        .modal-text { color: #aaa; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5; }
+        .key-display { font-family: monospace; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; color: #00f5ff; font-size: 0.85rem; word-break: break-all; margin: 10px 0; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes scan { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
       `}</style>
@@ -227,6 +241,20 @@ export default function Home() {
         <div className="zl-header">
           <div className="zl-logo">ZINLOCKED</div>
           <div className="zl-tagline">Real logos, 1000x cooler.</div>
+        </div>
+
+        <div className="zl-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <div className="zl-label" style={{ margin: 0 }}>API Key</div>
+            <button className="zl-btn zl-btn-secondary zl-small" onClick={() => setShowKeyModal(true)}>
+              {apiKey ? 'Change Key' : 'Set Key'}
+            </button>
+          </div>
+          {apiKey ? (
+            <div className="key-display">{apiKey}</div>
+          ) : (
+            <div style={{ color: '#ff4444', fontSize: '0.85rem' }}>No API Key set. Scripts will be public.</div>
+          )}
         </div>
 
         <div className="zl-card">
@@ -290,16 +318,20 @@ export default function Home() {
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#00f5ff', fontWeight: 700, marginBottom: '10px' }}>
                 &#128272; Protected Run URL
               </div>
-              <div className="zl-url" onClick={copyUrl}>{result.url}</div>
               <div className="zl-loadstring">{`loadstring(game:HttpGet("${result.url}"))()`}</div>
-              <div style={{ fontSize: '0.75rem', color: '#666' }}>Tap URL or loadstring to copy</div>
+              <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '10px' }}>Method 1: HttpGet (Token-based)</div>
               <div className="zl-btn-group">
                 <button className="zl-btn zl-btn-primary" onClick={copyLoadstring}>
                   &#128203; Copy Loadstring
                 </button>
-                <a href={`/api/download/${result.id}`} className="zl-btn zl-btn-secondary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                  &#11015; Download Encrypted
-                </a>
+              </div>
+              <div style={{ marginTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '10px' }}>Method 2: RequestAsync (API Key header)</div>
+                <div className="zl-btn-group">
+                  <button className="zl-btn zl-btn-secondary" onClick={copyRequestAsync}>
+                    &#128203; Copy RequestAsync
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -307,7 +339,7 @@ export default function Home() {
 
         {history.length > 0 && (
           <div className="zl-card">
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '15px' }}>&#128737; Protected Files</div>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '15px' }}>&#128737; Protected Scripts</div>
             {history.map((h) => (
               <div className="zl-file-item" key={h.id}>
                 <div>
@@ -316,7 +348,6 @@ export default function Home() {
                 </div>
                 <div className="zl-factions">
                   <button className="zl-btn zl-btn-secondary zl-small" onClick={() => loadHistory(h)}>Load</button>
-                  <a href={`/api/download/${h.id}`} className="zl-btn zl-btn-primary zl-small" style={{ textDecoration: 'none', display: 'inline-block' }}>Download</a>
                 </div>
               </div>
             ))}
@@ -328,6 +359,33 @@ export default function Home() {
           <div>Real logos, 1000x cooler. - Deployed on Vercel</div>
         </div>
       </div>
+
+      {showKeyModal && (
+        <div className="modal-overlay" onClick={() => setShowKeyModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">&#128272; API Key Authentication</div>
+            <div className="modal-text">
+              Set a secret API key to protect your scripts. Only executors with this key can access your scripts via RequestAsync. The token-based URL also works for basic protection.
+            </div>
+            <div className="zl-label">Your API Key</div>
+            <input
+              className="zl-input"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Enter a strong secret key..."
+              type="password"
+            />
+            <div className="zl-btn-group" style={{ marginTop: '20px' }}>
+              <button className="zl-btn zl-btn-primary" onClick={saveApiKey}>
+                Save Key
+              </button>
+              <button className="zl-btn zl-btn-secondary" onClick={() => setShowKeyModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
- }
+}
