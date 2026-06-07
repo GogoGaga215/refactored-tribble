@@ -9,13 +9,6 @@ export default async function handler(req, res) {
     return res.status(400).send('print("Invalid ID")')
   }
 
-  const ua = req.headers['user-agent'] || ''
-  const isRoblox = ua.includes('Roblox') || ua.includes('Synapse') || ua.includes('Krnl') || ua.includes('Fluxus') || ua.includes('Electron') || req.headers['x-executor']
-
-  if (!isRoblox) {
-    return res.status(403).send('print("Access denied - use loadstring(game:HttpGet(...))()\")')
-  }
-
   try {
     const data = await redis.get(`script:${id}`)
     if (!data) {
