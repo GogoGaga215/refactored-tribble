@@ -1,12 +1,28 @@
 import { Redis } from 'ioredis'
+import crypto from 'crypto'
 
 const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL || '')
+const SERVER_SECRET = process.env.ZINLOCKED_SECRET || 'server-secret-change-me'
+
+function verifyToken(id, token, apiKey) {
+  const key = apiKey || 'public'
+  const expected = crypto.createHmac('sha256', SERVER_SECRET).update(id + key).digest('hex').substring(0, 16)
+  return token === expected
+}
 
 export default async function handler(req, res) {
-  const { id } = req.query
+  const { id, token } = req.query
 
   if (!id || typeof id !== 'string') {
     return res.status(400).send('print("Invalid ID")')
+  }
+
+  // Block all browsers — no exceptions
+  const ua = req.headers['user-agent'] || ''
+  const isBrowser = ua.includes('Mozilla') || ua.includes('Chrome') || ua.includes('Safari') || ua.includes('Edge') || ua.includes('Firefox') || ua.includes('Opera')
+
+  if (isBrowser) {
+    return res.status(403).send('print("Access denied — Browser access blocked")')
   }
 
   try {
@@ -16,40 +32,24 @@ export default async function handler(req, res) {
     }
 
     const script = JSON.parse(data)
-    const encrypted = script.encryptedData
 
-    const decryptor = `
-local HttpService = game:GetService("HttpService")
-local function xor(a, b)
-    local r = 0
-    local p = 1
-    while a > 0 or b > 0 do
-        local ab = a % 2
-        local bb = b % 2
-        if ab ~= bb then r = r + p end
-        p = p * 2
-        a = math.floor(a / 2)
-        b = math.floor(b / 2)
-    end
-    return r
-end
-local function decrypt(b64)
-    local data = HttpService:Base64Decode(b64)
-    local key = string.byte(data, 1)
-    local enc = string.sub(data, 2)
-    local out = ""
-    for i = 1, #enc do
-        out = out .. string.char(xor(string.byte(enc, i), key))
-    end
-    return out
-end
-local code = decrypt("${encrypted}")
-loadstring(code)()
-`
+    // Method 1: API Key in header (RequestAsync) — most secure
+    const authHeader = req.headers['x-zinlocked-key'] || ''
+    if (authHeader && script.apiKey && authHeader === script.apiKey) {
+      res.setHeader('Content-Type', 'text/plain')
+      res.setHeader('Cache-Control', 'no-store')
+      res.send(script.plainCode)
+      return
+    }
+
+    // Method 2: HMAC token in URL (HttpGet) — basic protection
+    if (!token || !verifyToken(id, token, script.apiKey)) {
+      return res.status(403).send('print("Access denied — Invalid or missing token")')
+    }
 
     res.setHeader('Content-Type', 'text/plain')
     res.setHeader('Cache-Control', 'no-store')
-    res.send(decryptor)
+    res.send(script.plainCode)
   } catch (err) {
     res.status(500).send('print("Error: ' + err.message + '")')
   }
