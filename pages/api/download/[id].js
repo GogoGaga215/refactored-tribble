@@ -1,6 +1,6 @@
-import { Redis } from '@upstash/redis'
+import { Redis } from 'ioredis'
 
-const redis = Redis.fromEnv()
+const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL || '')
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'File not found' })
     }
 
-    const script = typeof data === 'string' ? JSON.parse(data) : data
+    const script = JSON.parse(data)
     const downloadName = `${script.name || 'protected'}_locked.lua`
 
     res.setHeader('Content-Type', 'application/octet-stream')
