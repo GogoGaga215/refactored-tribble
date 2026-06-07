@@ -42,6 +42,16 @@ export default function Home() {
     return id
   }
 
+  const generateStrongKey = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?'
+    let key = ''
+    for (let i = 0; i < 32; i++) {
+      key += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setApiKey(key)
+    showMessage('Strong key generated! Save it to use.', 'success')
+  }
+
   const handleFileSelect = (e) => {
     const selected = e.target.files?.[0]
     if (!selected) return
@@ -211,6 +221,7 @@ loadstring(response.Body)()`
         .zl-btn-primary { background: linear-gradient(135deg, #00f5ff, #7b2ff7); color: #fff; }
         .zl-btn-secondary { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
         .zl-btn-danger { background: linear-gradient(135deg, #ff0044, #ff8800); color: #fff; }
+        .zl-btn-success { background: linear-gradient(135deg, #00ff64, #00aa44); color: #fff; }
         .zl-btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
         .zl-result { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,245,255,0.2); border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; position: relative; overflow: hidden; }
         .zl-result::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00f5ff, #7b2ff7, transparent); animation: scan 3s linear infinite; }
@@ -233,6 +244,8 @@ loadstring(response.Body)()`
         .modal-title { font-size: 1.2rem; font-weight: 700; color: #00f5ff; margin-bottom: 15px; }
         .modal-text { color: #aaa; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5; }
         .key-display { font-family: monospace; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; color: #00f5ff; font-size: 0.85rem; word-break: break-all; margin: 10px 0; }
+        .key-row { display: flex; gap: 8px; align-items: center; }
+        .key-row .zl-input { margin-bottom: 0; flex: 1; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes scan { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
       `}</style>
@@ -251,7 +264,7 @@ loadstring(response.Body)()`
             </button>
           </div>
           {apiKey ? (
-            <div className="key-display">{apiKey}</div>
+            <div className="key-display">{apiKey.substring(0, 8)}****</div>
           ) : (
             <div style={{ color: '#ff4444', fontSize: '0.85rem' }}>No API Key set. Scripts will be public.</div>
           )}
@@ -368,13 +381,18 @@ loadstring(response.Body)()`
               Set a secret API key to protect your scripts. Only executors with this key can access your scripts via RequestAsync. The token-based URL also works for basic protection.
             </div>
             <div className="zl-label">Your API Key</div>
-            <input
-              className="zl-input"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter a strong secret key..."
-              type="password"
-            />
+            <div className="key-row">
+              <input
+                className="zl-input"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter a strong secret key..."
+                type="password"
+              />
+              <button className="zl-btn zl-btn-success" onClick={generateStrongKey}>
+                &#9889; Generate
+              </button>
+            </div>
             <div className="zl-btn-group" style={{ marginTop: '20px' }}>
               <button className="zl-btn zl-btn-primary" onClick={saveApiKey}>
                 Save Key
