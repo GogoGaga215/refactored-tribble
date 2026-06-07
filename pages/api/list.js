@@ -20,6 +20,7 @@ export default async function handler(req, res) {
           name: script.name,
           originalName: script.originalName,
           size: script.size,
+          hasKey: !!script.apiKey,
           createdAt: script.createdAt,
         })
       }
