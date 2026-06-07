@@ -1,6 +1,6 @@
-import { Redis } from '@upstash/redis'
+import { Redis } from 'ioredis'
 
-const redis = Redis.fromEnv()
+const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL || '')
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     for (const key of keys) {
       const data = await redis.get(key)
       if (data) {
-        const script = typeof data === 'string' ? JSON.parse(data) : data
+        const script = JSON.parse(data)
         scripts.push({
           id: script.id,
           name: script.name,
