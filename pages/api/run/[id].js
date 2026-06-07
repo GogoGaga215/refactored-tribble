@@ -2,7 +2,7 @@ import { Redis } from 'ioredis'
 import crypto from 'crypto'
 
 const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL || '')
-const SERVER_SECRET = process.env.ZINLOCKED_SECRET || 'server-secret-change-me'
+const SERVER_SECRET = process.env.ZINLOCKED_SECRET || 'aB3#fG7$hJ9&kL2@mN4$pQ6'
 
 function verifyToken(id, token, apiKey) {
   const key = apiKey || 'public'
