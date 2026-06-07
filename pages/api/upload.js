@@ -1,6 +1,6 @@
-import { Redis } from '@upstash/redis'
+import { Redis } from 'ioredis'
 
-const redis = Redis.fromEnv()
+const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL || '')
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,14 +18,14 @@ export default async function handler(req, res) {
     const protocol = host.includes('localhost') ? 'http' : 'https'
     const runUrl = `${protocol}://${host}/api/run/${id}`
 
-    await redis.set(`script:${id}`, JSON.stringify({
+    await redis.setex(`script:${id}`, 2592000, JSON.stringify({
       id,
       name: customName || originalName?.replace(/\.lua$/i, '') || 'protected',
       originalName: originalName || 'file.lua',
       encryptedData,
       size: size || 0,
       createdAt: new Date().toISOString(),
-    }), { ex: 2592000 })
+    }))
 
     return res.status(200).json({
       success: true,
